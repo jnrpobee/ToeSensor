@@ -146,6 +146,21 @@ const App = () => {
     }
   };
 
+    // Function to adjust volume or control playback based on the third input
+    const controlAudio = async (action) => {
+      try {
+        if (action === 'play') {
+          await SystemSetting.play();
+          console.log('Music playback started');
+        } else if (action === 'pause') {
+          await SystemSetting.pause();
+          console.log('Music playback paused');
+        } 
+      } catch (err) {
+        console.error('Audio control error:', err);
+      }
+    };
+
   const adjustVolume = async direction => {
     try {
       const volume = await SystemSetting.getVolume();
@@ -167,6 +182,7 @@ const App = () => {
       console.error('Volume adjustment error:', err);
     }
   };
+
 
   const startStreamingData = device => {
     device.monitorCharacteristicForService(
@@ -191,10 +207,17 @@ const App = () => {
             console.log('Volume down command received');
             await adjustVolume('down');
           }
+          else if (value.includes('PLAY')) {
+            console.log('Play command received');
+            await controlAudio('play');
+          }
+          else if (value.includes('PAUSE')) {
+            console.log('Pause command received');
+            await controlAudio('pause');
+          }
         }
-      },
+      }
     );
-  };
 
   const disconnect = async () => {
     if (connectedDevice) {
@@ -278,5 +301,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
+};
 
 export default App;
