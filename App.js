@@ -183,7 +183,7 @@ const App = () => {
     }
   };
 
-
+  // function to execute the commands received from the Arduino 
   const startStreamingData = device => {
     device.monitorCharacteristicForService(
       ARDUINO_SERVICE_UUID,
