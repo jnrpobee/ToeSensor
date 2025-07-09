@@ -93,9 +93,9 @@ android {
 
     compileSdkVersion rootProject.ext.compileSdkVersion
 
-    namespace "com.blecontroller6"
+    namespace "com.blecontroller3"
     defaultConfig {
-        applicationId "com.blecontroller6"
+        applicationId "com.blecontroller3"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
