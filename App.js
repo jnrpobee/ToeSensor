@@ -218,6 +218,7 @@ const App = () => {
         }
       }
     );
+  };
 
   const disconnect = async () => {
     if (connectedDevice) {
@@ -301,6 +302,5 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
-};
 
 export default App;
