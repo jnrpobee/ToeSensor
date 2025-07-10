@@ -8,9 +8,12 @@ import {
   PermissionsAndroid,
   Platform,
   Alert,
+  NativeModules,
 } from 'react-native';
 import {BleManager} from 'react-native-ble-plx';
 import SystemSetting from 'react-native-system-setting';
+
+const {MediaControlModule} = NativeModules;
 
 const bleManager = new BleManager();
 const ARDUINO_SERVICE_UUID = '180A';
@@ -146,18 +149,22 @@ const App = () => {
     }
   };
 
-    // Function to adjust volume or control playback based on the third input
+    // Function to control playback using native media control
     const controlAudio = async (action) => {
       try {
-        if (action === 'play') {
-          await SystemSetting.play();
-          console.log('Music playback started');
-        } else if (action === 'pause') {
-          await SystemSetting.pause();
-          console.log('Music playback paused');
-        } 
+        if (Platform.OS === 'android') {
+          if (action === 'play' || action === 'pause') {
+            console.log(`${action} command received - sending media key event`);
+            await MediaControlModule.sendMediaKeyEvent(action);
+            console.log('Media key event sent successfully');
+          }
+        } else {
+          // iOS: Not supported without custom native code
+          Alert.alert('Not supported on iOS');
+        }
       } catch (err) {
         console.error('Audio control error:', err);
+        Alert.alert('Media Control Error', err.message);
       }
     };
 

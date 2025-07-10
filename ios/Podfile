@@ -1,5 +1,11 @@
+source 'https://github.com/CocoaPods/Specs.git'
 require_relative '../node_modules/react-native/scripts/react_native_pods'
 require_relative '../node_modules/@react-native-community/cli-platform-ios/native_modules'
+
+# Fix for boost pod issue
+def common_pods
+  pod 'boost', :podspec => '../node_modules/react-native/third-party-podspecs/boost.podspec', :modular_headers => false
+end
 
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
@@ -26,6 +32,9 @@ target 'BLEController6' do
 
   # Flags change depending on the env values.
   flags = get_default_flags()
+
+  # Apply boost fix
+  common_pods
 
   use_react_native!(
     :path => config[:reactNativePath],
