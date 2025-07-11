@@ -36,6 +36,8 @@ public class MediaControlModule extends ReactContextBaseJavaModule {
                 keyCode = KeyEvent.KEYCODE_MEDIA_PLAY;
             } else if ("pause".equals(action)) {
                 keyCode = KeyEvent.KEYCODE_MEDIA_PAUSE;
+            } else if ("skip".equals(action)){
+                keyCode = KeyEvent.KEYCODE_MEDIA_NEXT;
             } else {
                 promise.reject("INVALID_ACTION", "Invalid action: " + action);
                 return;

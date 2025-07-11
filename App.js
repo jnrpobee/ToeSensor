@@ -149,11 +149,11 @@ const App = () => {
     }
   };
 
-    // Function to control playback using native media control
+    // Function to control playback using native media control. Includes play, pause, and skip.
     const controlAudio = async (action) => {
       try {
         if (Platform.OS === 'android') {
-          if (action === 'play' || action === 'pause') {
+          if (action === 'play' || action === 'pause' || action === 'skip') {
             console.log(`${action} command received - sending media key event`);
             await MediaControlModule.sendMediaKeyEvent(action);
             console.log('Media key event sent successfully');
@@ -221,6 +221,10 @@ const App = () => {
           else if (value.includes('PAUSE')) {
             console.log('Pause command received');
             await controlAudio('pause');
+          }
+          else if (value.includes('SKIP')) {
+            console.log('Skip command received');
+            await controlAudio('skip');
           }
         }
       }
