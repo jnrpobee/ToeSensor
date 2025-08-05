@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import {BleManager} from 'react-native-ble-plx';
 import SystemSetting from 'react-native-system-setting';
+import {GoProController, handleGoProCommand} from './gopro-integration';
 
 const {MediaControlModule} = NativeModules;
 
@@ -66,6 +67,8 @@ const App = () => {
   const [connectedDevice, setConnectedDevice] = useState(null);
   const [deviceStatus, setDeviceStatus] = useState('Disconnected');
   const [currentVolume, setCurrentVolume] = useState(0);
+  const [goproController] = useState(new GoProController());
+  const [goproStatus, setGoproStatus] = useState('Not Connected');
 
   useEffect(() => {
     const subscription = bleManager.onStateChange(state => {
@@ -226,6 +229,14 @@ const App = () => {
             console.log('Skip command received');
             await controlAudio('skip');
           }
+          else if (value.includes('GOPRO_PHOTO')) {
+            console.log('GoPro photo command received');
+            await handleGoProCommand('GOPRO_PHOTO', goproController);
+          }
+          else if (value.includes('GOPRO_CONNECT')) {
+            console.log('GoPro connect command received');
+            await handleGoProCommand('GOPRO_CONNECT', goproController);
+          }
         }
       }
     );
@@ -251,6 +262,9 @@ const App = () => {
         <Text style={styles.status}>Status: {deviceStatus}</Text>
         <Text style={styles.volume}>
           Volume: {Math.round(currentVolume * 100)}%
+        </Text>
+        <Text style={styles.status}>
+          GoPro: {goproStatus}
         </Text>
         <TouchableOpacity
           style={[styles.button, isScanning && styles.buttonDisabled]}
