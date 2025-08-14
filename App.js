@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import {BleManager} from 'react-native-ble-plx';
 import SystemSetting from 'react-native-system-setting';
+import {ESP32CameraController, handleESP32CameraCommand} from './esp32-camera-integration';
 
 const {MediaControlModule} = NativeModules;
 
@@ -66,6 +67,8 @@ const App = () => {
   const [connectedDevice, setConnectedDevice] = useState(null);
   const [deviceStatus, setDeviceStatus] = useState('Disconnected');
   const [currentVolume, setCurrentVolume] = useState(0);
+  const [esp32Camera] = useState(new ESP32CameraController());
+  const [cameraStatus, setCameraStatus] = useState('Not Connected');
 
   useEffect(() => {
     const subscription = bleManager.onStateChange(state => {
@@ -226,6 +229,22 @@ const App = () => {
             console.log('Skip command received');
             await controlAudio('skip');
           }
+          else if (value.includes('CAMERA_PHOTO_TAKEN')) {
+            console.log('ESP32 camera photo taken');
+            await handleESP32CameraCommand('CAMERA_PHOTO_TAKEN', esp32Camera);
+            setCameraStatus('Photo Captured');
+          }
+          else if (value.includes('CAMERA_ERROR')) {
+            console.log('ESP32 camera error');
+            const errorMsg = value.replace('CAMERA_ERROR:', '').trim();
+            await handleESP32CameraCommand('CAMERA_ERROR', esp32Camera);
+            setCameraStatus('Camera Error');
+          }
+          else if (value.includes('CAMERA_READY')) {
+            console.log('ESP32 camera ready');
+            await handleESP32CameraCommand('CAMERA_READY', esp32Camera);
+            setCameraStatus('Camera Ready');
+          }
         }
       }
     );
@@ -251,6 +270,9 @@ const App = () => {
         <Text style={styles.status}>Status: {deviceStatus}</Text>
         <Text style={styles.volume}>
           Volume: {Math.round(currentVolume * 100)}%
+        </Text>
+        <Text style={styles.status}>
+          ESP32 Camera: {cameraStatus}
         </Text>
         <TouchableOpacity
           style={[styles.button, isScanning && styles.buttonDisabled]}
