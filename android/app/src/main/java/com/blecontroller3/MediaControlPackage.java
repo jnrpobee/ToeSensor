@@ -19,6 +19,7 @@ public class MediaControlPackage implements ReactPackage {
     public List<NativeModule> createNativeModules(ReactApplicationContext reactContext) {
         List<NativeModule> modules = new ArrayList<>();
         modules.add(new MediaControlModule(reactContext));
+        modules.add(new OpenWifiModule(reactContext));
         return modules;
     }
 } 

@@ -41,20 +41,20 @@ This guide shows how to integrate your GoPro Hero 11 Black Mini with your Arduin
 1. **The GoPro integration code** (`gopro-integration.js`) has been added to your project
 2. **Your main App.js** has been updated to handle GoPro commands
 3. **The app will now respond to these BLE commands:**
-   - `GOPRO_PHOTO` - Takes a photo
+   - `GOPRO_VIDEO` - Start/stop video recording (toggle each BLE command)
    - `GOPRO_CONNECT` - Connects to GoPro WiFi
 
 ## How It Works
 
 ### Flow:
 1. **Sensor Input** → Arduino detects sensor trigger
-2. **BLE Command** → Arduino sends `GOPRO_PHOTO` via BLE
-3. **Phone App** → Receives command and connects to GoPro WiFi
-4. **GoPro API** → Phone app sends photo command to GoPro
-5. **Photo Taken** → GoPro takes photo and saves to SD card
+2. **BLE Command** → Arduino sends `GOPRO_VIDEO` via BLE
+3. **Phone App** → Receives command (phone should be on GoPro Wi-Fi for API calls)
+4. **GoPro API** → Phone app starts or stops recording on the GoPro
+5. **Clip saved** → GoPro writes video to the SD card when recording stops
 
 ### Commands Your Arduino Can Send:
-- `GOPRO_PHOTO` - Takes a photo when sensor is triggered
+- `GOPRO_VIDEO` - Toggles recording (start on first trigger, stop on second)
 - `GOPRO_CONNECT` - Manually connect to GoPro (optional button)
 
 ## Testing
@@ -64,7 +64,7 @@ This guide shows how to integrate your GoPro Hero 11 Black Mini with your Arduin
 2. Open your phone app
 3. Connect to Arduino via BLE
 4. Trigger your sensor or press the GoPro button
-5. Check the app logs for "GoPro photo command received"
+5. Check the app logs for "GoPro record toggle command received"
 
 ### Test GoPro Connection:
 1. Ensure GoPro WiFi is enabled
@@ -85,8 +85,8 @@ This guide shows how to integrate your GoPro Hero 11 Black Mini with your Arduin
    - Verify sensor wiring and thresholds
    - Check Serial Monitor for debug messages
 
-3. **Photos not being taken:**
-   - Ensure GoPro is in photo mode
+3. **Video not starting/stopping:**
+   - Ensure the phone is on the GoPro Wi-Fi network when recording
    - Check GoPro battery level
    - Verify SD card has space
 
@@ -121,12 +121,13 @@ You can add more GoPro commands by:
 
 ### GoPro WiFi API Endpoints:
 - `GET /gp/gpControl/info` - Get camera info
-- `GET /gp/gpControl/setting/10/1` - Set photo mode
-- `GET /gp/gpControl/command/mode?p=1` - Take photo
+- `GET /gp/gpControl/command/mode?p=0` - Video mode
+- `GET /gp/gpControl/command/shutter?p=1` - Start recording
+- `GET /gp/gpControl/command/shutter?p=0` - Stop recording
 - `GET /gp/gpControl/execute?p1=gpMediaList` - List media files
 
 ### BLE Commands:
-- `GOPRO_PHOTO` - Trigger photo capture
+- `GOPRO_VIDEO` - Toggle video recording (start / stop)
 - `GOPRO_CONNECT` - Connect to GoPro WiFi
 
 ## Next Steps

@@ -14,50 +14,68 @@ import {BleManager} from 'react-native-ble-plx';
 import SystemSetting from 'react-native-system-setting';
 import {GoProController, handleGoProCommand} from './gopro-integration';
 
-const {MediaControlModule} = NativeModules;
+const {MediaControlModule, OpenWifi} = NativeModules;
 
 const bleManager = new BleManager();
-const ARDUINO_SERVICE_UUID = '180A';
-const ARDUINO_CHARACTERISTIC_UUID = '2A57';
 
-// Function to decode base64 to text
-const base64ToAscii = base64String => {
+// 16-bit UUIDs as full Bluetooth base UUID (Android matching is more reliable).
+const toFullUuid16 = short =>
+  `0000${String(short).toLowerCase()}-0000-1000-8000-00805f9b34fb`;
+const ARDUINO_SERVICE_UUID = toFullUuid16('180a');
+const ARDUINO_CHARACTERISTIC_UUID = toFullUuid16('2a57');
+
+const BASE64_ALPHABET =
+  'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+/** Decode react-native-ble-plx Base64 without Hermes atob() (padding/strictness bugs on RN 0.71). */
+const bleBase64ToCommandString = base64String => {
+  if (!base64String) {
+    return '';
+  }
   try {
-    console.log('Original base64 string:', base64String);
+    let b64 = String(base64String).replace(/\s/g, '').replace(/-/g, '+').replace(/_/g, '/');
+    const padLen = (4 - (b64.length % 4)) % 4;
+    b64 += '='.repeat(padLen);
 
-    // Lookup table for base64
-    const lookup =
-      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-
-    // Remove padding and non-base64 characters
-    const cleanBase64 = base64String.replace(/=+$/, '');
-
-    // Convert to binary
-    let binary = '';
-    for (let i = 0; i < cleanBase64.length; i++) {
-      let byte = lookup.indexOf(cleanBase64[i]).toString(2);
-      // Pad each byte to 6 bits
-      byte = '0'.repeat(6 - byte.length) + byte;
-      binary += byte;
-    }
-
-    // Convert binary to ASCII
-    let ascii = '';
-    for (let i = 0; i < binary.length; i += 8) {
-      const byte = binary.substr(i, 8);
-      if (byte.length === 8) {
-        const charCode = parseInt(byte, 2);
-        // Only include printable ASCII characters
-        if (charCode >= 32 && charCode <= 126) {
-          ascii += String.fromCharCode(charCode);
-        }
+    const bytes = [];
+    for (let i = 0; i < b64.length; i += 4) {
+      const c1 = b64[i];
+      const c2 = b64[i + 1];
+      const c3 = b64[i + 2];
+      const c4 = b64[i + 3];
+      if (c1 === '=' || c1 === undefined) {
+        break;
+      }
+      const n1 = BASE64_ALPHABET.indexOf(c1);
+      const n2 = c2 === '=' || c2 === undefined ? 0 : BASE64_ALPHABET.indexOf(c2);
+      const n3 = c3 === '=' || c3 === undefined ? 0 : BASE64_ALPHABET.indexOf(c3);
+      const n4 = c4 === '=' || c4 === undefined ? 0 : BASE64_ALPHABET.indexOf(c4);
+      if (n1 < 0 || n2 < 0 || n3 < 0 || n4 < 0) {
+        break;
+      }
+      const triple = (n1 << 18) | (n2 << 12) | (n3 << 6) | n4;
+      if (c2 !== '=') {
+        bytes.push((triple >> 16) & 0xff);
+      }
+      if (c3 !== '=') {
+        bytes.push((triple >> 8) & 0xff);
+      }
+      if (c4 !== '=') {
+        bytes.push(triple & 0xff);
       }
     }
 
-    console.log('Decoded string:', ascii);
-    return ascii;
+    let out = '';
+    for (let j = 0; j < bytes.length; j++) {
+      if (bytes[j] !== 0) {
+        out += String.fromCharCode(bytes[j]);
+      }
+    }
+    const cleaned = out.trim();
+    console.log('BLE decoded command:', JSON.stringify(cleaned));
+    return cleaned;
   } catch (error) {
-    console.error('Base64 decode error:', error);
+    console.error('BLE base64 decode error:', error, base64String);
     return '';
   }
 };
@@ -68,7 +86,8 @@ const App = () => {
   const [deviceStatus, setDeviceStatus] = useState('Disconnected');
   const [currentVolume, setCurrentVolume] = useState(0);
   const [goproController] = useState(new GoProController());
-  const [goproStatus, setGoproStatus] = useState('Not Connected');
+  const [goproStatus, setGoproStatus] = useState('Not connected');
+  const [goproConnectBusy, setGoproConnectBusy] = useState(false);
 
   useEffect(() => {
     const subscription = bleManager.onStateChange(state => {
@@ -207,10 +226,24 @@ const App = () => {
         if (characteristic?.value) {
           console.log('\n--- New BLE Data Received ---');
           console.log('Raw characteristic value:', characteristic.value);
-          const value = base64ToAscii(characteristic.value);
+          const value = bleBase64ToCommandString(characteristic.value);
           console.log('Final decoded value:', value);
 
-          if (value.includes('VOL_UP')) {
+          if (value.includes('GOPRO_VIDEO')) {
+            console.log('GoPro record toggle command received');
+            await handleGoProCommand(
+              'GOPRO_VIDEO',
+              goproController,
+              setGoproStatus,
+            );
+          } else if (value.includes('GOPRO_CONNECT')) {
+            console.log('GoPro connect command received');
+            await handleGoProCommand(
+              'GOPRO_CONNECT',
+              goproController,
+              setGoproStatus,
+            );
+          } else if (value.includes('VOL_UP')) {
             console.log('Volume up command received');
             await adjustVolume('up');
           } else if (value.includes('VOL_DOWN') || value.includes('VOL_DO')) {
@@ -229,14 +262,6 @@ const App = () => {
             console.log('Skip command received');
             await controlAudio('skip');
           }
-          else if (value.includes('GOPRO_PHOTO')) {
-            console.log('GoPro photo command received');
-            await handleGoProCommand('GOPRO_PHOTO', goproController);
-          }
-          else if (value.includes('GOPRO_CONNECT')) {
-            console.log('GoPro connect command received');
-            await handleGoProCommand('GOPRO_CONNECT', goproController);
-          }
         }
       }
     );
@@ -253,6 +278,59 @@ const App = () => {
         setDeviceStatus('Disconnect Failed: ' + error.message);
       }
     }
+  };
+
+  const runGoProConnectTest = async () => {
+    if (goproConnectBusy) {
+      return;
+    }
+    setGoproConnectBusy(true);
+    try {
+      await handleGoProCommand(
+        'GOPRO_CONNECT',
+        goproController,
+        setGoproStatus,
+      );
+    } finally {
+      setGoproConnectBusy(false);
+    }
+  };
+
+  const connectToGoProManual = () => {
+    if (goproConnectBusy) {
+      return;
+    }
+
+    if (Platform.OS === 'android' && OpenWifi?.openWifiSettings) {
+      Alert.alert(
+        'GoPro Wi-Fi',
+        'Tap Open Wi-Fi to pick your GoPro network. When you return here, tap Test connection to verify the camera is reachable.',
+        [
+          {text: 'Cancel', style: 'cancel'},
+          {
+            text: 'Open Wi-Fi',
+            onPress: () => {
+              try {
+                OpenWifi.openWifiSettings();
+              } catch (e) {
+                console.warn('openWifiSettings failed', e);
+              }
+            },
+          },
+          {text: 'Test connection', onPress: () => runGoProConnectTest()},
+        ],
+      );
+      return;
+    }
+
+    Alert.alert(
+      'GoPro Wi-Fi',
+      'iOS does not allow apps to open Wi-Fi settings for you. Open Settings → Wi-Fi, join your GoPro network, then tap Test connection.',
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {text: 'Test connection', onPress: () => runGoProConnectTest()},
+      ],
+    );
   };
 
   return (
@@ -276,6 +354,18 @@ const App = () => {
               : connectedDevice
               ? 'Disconnect'
               : 'Scan and Connect'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.button,
+            styles.buttonGoPro,
+            goproConnectBusy && styles.buttonDisabled,
+          ]}
+          onPress={connectToGoProManual}
+          disabled={goproConnectBusy}>
+          <Text style={styles.buttonText}>
+            {goproConnectBusy ? 'Connecting...' : 'Connect to GoPro'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -320,6 +410,9 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     backgroundColor: '#999',
+  },
+  buttonGoPro: {
+    backgroundColor: '#5856D6',
   },
   buttonText: {
     color: 'white',
